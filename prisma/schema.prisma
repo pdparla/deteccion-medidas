@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  password      String
+  height        Float?        // cm - altura del usuario
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  calibrations  Calibration[]
+  measurements  Measurement[]
+}
+
+model Calibration {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Calibration coefficients for each measurement
+  neckCoeff       Float    @default(0.37)
+  shouldersCoeff  Float    @default(0.80)
+  chestCoeff      Float    @default(0.72)
+  waistCoeff      Float    @default(1.09)
+  hipsCoeff       Float    @default(0.98)
+  thighCoeff      Float    @default(1.15)
+  calfCoeff       Float    @default(0.89)
+  bicepCoeff      Float    @default(1.47)
+
+  isCalibrated    Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId])
+}
+
+model Measurement {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  height     Float    // cm
+
+  // Measurements in cm
+  neck       Float
+  shoulders  Float
+  chest      Float
+  waist      Float
+  hips       Float
+  thigh      Float
+  calf       Float
+  bicep      Float
+
+  createdAt  DateTime @default(now())
+}
