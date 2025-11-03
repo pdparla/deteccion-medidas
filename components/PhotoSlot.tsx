@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { PhotoSlotProps } from '@/types';
 
 export default function PhotoSlot({ type, label, file, onFileSelect }: PhotoSlotProps) {
@@ -85,11 +86,15 @@ export default function PhotoSlot({ type, label, file, onFileSelect }: PhotoSlot
 
       {preview ? (
         <div className="space-y-2">
-          <img
-            src={preview}
-            alt={label}
-            className="w-full h-40 object-cover rounded"
-          />
+          <div className="relative w-full h-48 bg-gray-100 rounded">
+            <Image
+              src={preview}
+              alt={label}
+              fill
+              className="object-contain rounded"
+              unoptimized
+            />
+          </div>
           <p className="text-sm font-medium text-success text-center">
             {label} ✓
           </p>
