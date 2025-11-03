@@ -1,8 +1,38 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function Home() {
+  const { status } = useSession();
+  const router = useRouter();
+
+  // Redirigir a /measurement si ya está autenticado
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.push('/measurement');
+    }
+  }, [status, router]);
+
+  // Mostrar loading mientras verifica autenticación
+  if (status === 'loading') {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // No mostrar nada si está autenticado (se redirigirá)
+  if (status === 'authenticated') {
+    return null;
+  }
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-2xl w-full text-center space-y-8">
@@ -56,7 +86,7 @@ export default function Home() {
           </div>
 
           <Link
-            href="/measurement"
+            href="/auth/signin"
             className="inline-block bg-primary hover:bg-blue-600 text-white font-semibold text-lg px-8 py-4 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105"
           >
             Comenzar

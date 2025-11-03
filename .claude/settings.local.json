@@ -6,7 +6,12 @@
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
       "Bash(timeout 10 bash:*)",
-      "Bash(timeout 15 bash:*)"
+      "Bash(timeout 15 bash:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma init)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,29 +9,52 @@ interface AllPoses {
   right: PoseLandmarks;
 }
 
+export interface CalibrationCoefficients {
+  neckCoeff: number;
+  shouldersCoeff: number;
+  chestCoeff: number;
+  waistCoeff: number;
+  hipsCoeff: number;
+  thighCoeff: number;
+  calfCoeff: number;
+  bicepCoeff: number;
+}
+
+const DEFAULT_COEFFICIENTS: CalibrationCoefficients = {
+  neckCoeff: 0.37,
+  shouldersCoeff: 0.80,
+  chestCoeff: 0.72,
+  waistCoeff: 1.09,
+  hipsCoeff: 0.98,
+  thighCoeff: 1.15,
+  calfCoeff: 0.89,
+  bicepCoeff: 1.47,
+};
+
 export async function calculateBodyMeasurements(
   poses: AllPoses,
-  userHeight: number
+  userHeight: number,
+  coefficients: CalibrationCoefficients = DEFAULT_COEFFICIENTS
 ): Promise<BodyMeasurements> {
   // Calcular escala usando la foto frontal
   const scale = calculateScale(poses.front, userHeight);
 
   // Calcular cada medida
   const measurements: BodyMeasurements = {
-    neck: calculateNeck(poses.front, poses.left, scale),
-    shoulders: calculateShoulders(poses.front, scale),
-    chest: calculateChest(poses.front, poses.left, scale),
-    waist: calculateWaist(poses.front, poses.left, scale),
-    hips: calculateHips(poses.front, poses.left, scale),
-    thigh: calculateThigh(poses.front, poses.left, scale),
-    calf: calculateCalf(poses.front, poses.left, scale),
-    bicep: calculateBicep(poses.front, poses.left, scale),
+    neck: calculateNeck(poses.front, poses.left, scale, coefficients.neckCoeff),
+    shoulders: calculateShoulders(poses.front, scale, coefficients.shouldersCoeff),
+    chest: calculateChest(poses.front, poses.left, scale, coefficients.chestCoeff),
+    waist: calculateWaist(poses.front, poses.left, scale, coefficients.waistCoeff),
+    hips: calculateHips(poses.front, poses.left, scale, coefficients.hipsCoeff),
+    thigh: calculateThigh(poses.front, poses.left, scale, coefficients.thighCoeff),
+    calf: calculateCalf(poses.front, poses.left, scale, coefficients.calfCoeff),
+    bicep: calculateBicep(poses.front, poses.left, scale, coefficients.bicepCoeff),
   };
 
   return measurements;
 }
 
-function calculateNeck(front: PoseLandmarks, side: PoseLandmarks, scale: number): number {
+function calculateNeck(front: PoseLandmarks, side: PoseLandmarks, scale: number, coeff: number): number {
   const { landmarks: frontLandmarks, imageWidth: fw, imageHeight: fh } = front;
   const { landmarks: sideLandmarks, imageWidth: sw, imageHeight: sh } = side;
 
@@ -45,11 +68,10 @@ function calculateNeck(front: PoseLandmarks, side: PoseLandmarks, scale: number)
   const sideShoulder = sideLandmarks[POSE_LANDMARKS.LEFT_SHOULDER];
   const sideDepth = Math.abs((sideEar.x - sideShoulder.x) * sw) * scale * 0.3;
 
-  // Coeficiente de corrección: 40 / 107.3 ≈ 0.37
-  return estimateCircumference(frontWidth, sideDepth) * 0.37;
+  return estimateCircumference(frontWidth, sideDepth) * coeff;
 }
 
-function calculateShoulders(front: PoseLandmarks, scale: number): number {
+function calculateShoulders(front: PoseLandmarks, scale: number, coeff: number): number {
   const { landmarks, imageWidth, imageHeight } = front;
 
   const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
@@ -57,11 +79,10 @@ function calculateShoulders(front: PoseLandmarks, scale: number): number {
 
   const distance = calculateDistance(leftShoulder, rightShoulder, imageWidth, imageHeight);
 
-  // Coeficiente de corrección: 53 / 66.2 ≈ 0.80
-  return distance * scale * 0.80;
+  return distance * scale * coeff;
 }
 
-function calculateChest(front: PoseLandmarks, side: PoseLandmarks, scale: number): number {
+function calculateChest(front: PoseLandmarks, side: PoseLandmarks, scale: number, coeff: number): number {
   const { landmarks: frontLandmarks, imageWidth: fw, imageHeight: fh } = front;
   const { landmarks: sideLandmarks, imageWidth: sw, imageHeight: sh } = side;
 
@@ -77,11 +98,10 @@ function calculateChest(front: PoseLandmarks, side: PoseLandmarks, scale: number
   // Estimar profundidad del torso a nivel del pecho
   const torsoDepth = Math.abs((sideShoulder.x - sideHip.x) * sw) * scale * 0.5;
 
-  // Coeficiente de corrección ajustado: 106 / 95.8 ≈ 1.11
-  return estimateCircumference(frontWidth, torsoDepth) * 0.72;
+  return estimateCircumference(frontWidth, torsoDepth) * coeff;
 }
 
-function calculateWaist(front: PoseLandmarks, side: PoseLandmarks, scale: number): number {
+function calculateWaist(front: PoseLandmarks, side: PoseLandmarks, scale: number, coeff: number): number {
   const { landmarks: frontLandmarks, imageWidth: fw, imageHeight: fh } = front;
   const { landmarks: sideLandmarks, imageWidth: sw, imageHeight: sh } = side;
 
@@ -98,11 +118,10 @@ function calculateWaist(front: PoseLandmarks, side: PoseLandmarks, scale: number
   const waistX = sideShoulder.x + (sideHip.x - sideShoulder.x) * 0.6;
   const sideDepth = Math.abs(waistX * sw - sideShoulder.x * sw) * scale * 0.65;
 
-  // Coeficiente de corrección: 89 / 81.9 ≈ 1.09
-  return estimateCircumference(frontWidth, sideDepth) * 1.09;
+  return estimateCircumference(frontWidth, sideDepth) * coeff;
 }
 
-function calculateHips(front: PoseLandmarks, side: PoseLandmarks, scale: number): number {
+function calculateHips(front: PoseLandmarks, side: PoseLandmarks, scale: number, coeff: number): number {
   const { landmarks: frontLandmarks, imageWidth: fw, imageHeight: fh } = front;
   const { landmarks: sideLandmarks, imageWidth: sw, imageHeight: sh } = side;
 
@@ -116,11 +135,10 @@ function calculateHips(front: PoseLandmarks, side: PoseLandmarks, scale: number)
   const sideShoulder = sideLandmarks[POSE_LANDMARKS.LEFT_SHOULDER];
   const sideDepth = Math.abs((sideHip.x - sideShoulder.x) * sw) * scale * 0.6;
 
-  // Coeficiente de corrección: 95 / 96.8 ≈ 0.98 (casi perfecto!)
-  return estimateCircumference(frontWidth, sideDepth) * 0.98;
+  return estimateCircumference(frontWidth, sideDepth) * coeff;
 }
 
-function calculateThigh(front: PoseLandmarks, side: PoseLandmarks, scale: number): number {
+function calculateThigh(front: PoseLandmarks, side: PoseLandmarks, scale: number, coeff: number): number {
   const { landmarks: frontLandmarks, imageWidth: fw, imageHeight: fh } = front;
   const { landmarks: sideLandmarks, imageWidth: sw, imageHeight: sh } = side;
 
@@ -144,11 +162,10 @@ function calculateThigh(front: PoseLandmarks, side: PoseLandmarks, scale: number
   const thighX = sideHip.x + (sideKnee.x - sideHip.x) * 0.3;
   const thighDepth = Math.abs(thighX * sw - sideKnee.x * sw) * scale * 0.9;
 
-  // Coeficiente de corrección ajustado: 61 / 74.6 ≈ 0.82
-  return estimateCircumference(hipWidth, thighDepth) * 1.15;
+  return estimateCircumference(hipWidth, thighDepth) * coeff;
 }
 
-function calculateCalf(front: PoseLandmarks, side: PoseLandmarks, scale: number): number {
+function calculateCalf(front: PoseLandmarks, side: PoseLandmarks, scale: number, coeff: number): number {
   const { landmarks: frontLandmarks, imageWidth: fw, imageHeight: fh } = front;
   const { landmarks: sideLandmarks, imageWidth: sw, imageHeight: sh } = side;
 
@@ -165,11 +182,10 @@ function calculateCalf(front: PoseLandmarks, side: PoseLandmarks, scale: number)
   const calfX = sideKnee.x + (sideAnkle.x - sideKnee.x) * 0.4;
   const calfDepth = Math.abs(calfX * sw - sideAnkle.x * sw) * scale * 0.5;
 
-  // Coeficiente de corrección: 38 / 42.9 ≈ 0.89
-  return estimateCircumference(kneeWidth, calfDepth) * 0.89;
+  return estimateCircumference(kneeWidth, calfDepth) * coeff;
 }
 
-function calculateBicep(front: PoseLandmarks, side: PoseLandmarks, scale: number): number {
+function calculateBicep(front: PoseLandmarks, side: PoseLandmarks, scale: number, coeff: number): number {
   const { landmarks: frontLandmarks, imageWidth: fw, imageHeight: fh } = front;
   const { landmarks: sideLandmarks, imageWidth: sw, imageHeight: sh } = side;
 
@@ -187,6 +203,5 @@ function calculateBicep(front: PoseLandmarks, side: PoseLandmarks, scale: number
   const bicepX = sideShoulder.x + (sideElbow.x - sideShoulder.x) * 0.4;
   const bicepDepth = Math.abs(bicepX * sw - sideElbow.x * sw) * scale * 0.5;
 
-  // Coeficiente de corrección ajustado: 38 / 47.6 ≈ 0.80
-  return estimateCircumference(bicepWidth, bicepDepth) * 1.47;
+  return estimateCircumference(bicepWidth, bicepDepth) * coeff;
 }
