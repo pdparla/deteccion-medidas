@@ -6,9 +6,10 @@ import { useState } from 'react';
 interface MeasurementResultsProps {
   measurements: BodyMeasurements;
   onRestart: () => void;
+  onRecalibrate?: () => void;
 }
 
-export default function MeasurementResults({ measurements, onRestart }: MeasurementResultsProps) {
+export default function MeasurementResults({ measurements, onRestart, onRecalibrate }: MeasurementResultsProps) {
   const [copied, setCopied] = useState(false);
 
   const measurementLabels: { key: keyof BodyMeasurements; label: string; icon: string }[] = [
@@ -89,6 +90,15 @@ export default function MeasurementResults({ measurements, onRestart }: Measurem
             </>
           )}
         </button>
+        {onRecalibrate && (
+          <button
+            onClick={onRecalibrate}
+            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+          >
+            <span>🔧</span>
+            <span>Recalibrar</span>
+          </button>
+        )}
         <button
           onClick={onRestart}
           className="flex-1 bg-primary hover:bg-blue-600 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200"

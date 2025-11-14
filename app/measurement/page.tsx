@@ -257,6 +257,12 @@ export default function MeasurementPage() {
     setShowCalibration(false);
   };
 
+  const handleRecalibrate = () => {
+    // Volver al formulario de calibración con las medidas actuales
+    setShowCalibration(true);
+    setCurrentStep(3);
+  };
+
   // Mostrar loading mientras verifica autenticación
   if (status === 'loading' || isLoadingModel) {
     return (
@@ -362,7 +368,11 @@ export default function MeasurementPage() {
         )}
 
         {currentStep === 4 && measurements && (
-          <MeasurementResults measurements={measurements} onRestart={handleRestart} />
+          <MeasurementResults
+            measurements={measurements}
+            onRestart={handleRestart}
+            onRecalibrate={handleRecalibrate}
+          />
         )}
       </div>
     </main>
