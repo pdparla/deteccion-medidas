@@ -2,6 +2,8 @@ import { PoseLandmarks } from '@/types';
 import * as poseDetection from '@tensorflow-models/pose-detection';
 import * as tf from '@tensorflow/tfjs-core';
 import '@tensorflow/tfjs-backend-webgl';
+import '@tensorflow/tfjs-backend-cpu';
+import { createOrientedImage } from './imageUtils';
 
 // MoveNet keypoint indices (17 keypoints)
 export const POSE_LANDMARKS = {
@@ -32,10 +34,21 @@ export async function initializePose(): Promise<poseDetection.PoseDetector> {
     return detectorInstance;
   }
 
-  // Initialize TensorFlow.js backend
+  // Initialize TensorFlow.js backend with fallback
   if (!isBackendReady) {
     await tf.ready();
-    await tf.setBackend('webgl');
+
+    try {
+      // Try WebGL first (faster, better performance)
+      await tf.setBackend('webgl');
+      console.log('TensorFlow.js: Using WebGL backend');
+    } catch (error) {
+      // Fallback to CPU if WebGL fails (mobile compatibility)
+      console.warn('WebGL backend failed, falling back to CPU:', error);
+      await tf.setBackend('cpu');
+      console.log('TensorFlow.js: Using CPU backend');
+    }
+
     isBackendReady = true;
   }
 
@@ -53,8 +66,9 @@ export async function detectPose(imageFile: File): Promise<PoseLandmarks | null>
   try {
     const detector = await initializePose();
 
-    // Create image element
-    const img = await createImageFromFile(imageFile);
+    // Create properly oriented image element (handles EXIF orientation)
+    const img = await createOrientedImage(imageFile);
+    console.log(`Processing image: ${img.width}x${img.height}px`);
 
     // Detect poses
     const poses = await detector.estimatePoses(img);
@@ -103,25 +117,6 @@ export async function detectPose(imageFile: File): Promise<PoseLandmarks | null>
     console.error('Error detecting pose:', error);
     throw error;
   }
-}
-
-function createImageFromFile(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Error cargando imagen'));
-    };
-
-    img.src = url;
-  });
 }
 
 export function calculateDistance(
