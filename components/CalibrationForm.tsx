@@ -11,6 +11,11 @@ interface CalibrationFormProps {
 
 export default function CalibrationForm({ predictedMeasurements, onSubmit, onSkip }: CalibrationFormProps) {
   const [realMeasurements, setRealMeasurements] = useState<BodyMeasurements>({ ...predictedMeasurements });
+  const [inputValues, setInputValues] = useState<Record<keyof BodyMeasurements, string>>(
+    Object.fromEntries(
+      Object.entries(predictedMeasurements).map(([key, value]) => [key, Math.round(value).toString()])
+    ) as Record<keyof BodyMeasurements, string>
+  );
 
   const measurementLabels: { key: keyof BodyMeasurements; label: string; icon: string }[] = [
     { key: 'neck', label: 'Cuello', icon: '👔' },
@@ -29,9 +34,15 @@ export default function CalibrationForm({ predictedMeasurements, onSubmit, onSki
   };
 
   const handleChange = (key: keyof BodyMeasurements, value: string) => {
-    const numValue = parseFloat(value);
-    if (!isNaN(numValue) && numValue > 0) {
-      setRealMeasurements({ ...realMeasurements, [key]: numValue });
+    // Allow empty string or valid number input
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setInputValues({ ...inputValues, [key]: value });
+
+      // Update realMeasurements only if valid number
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue > 0) {
+        setRealMeasurements({ ...realMeasurements, [key]: numValue });
+      }
     }
   };
 
@@ -66,12 +77,12 @@ export default function CalibrationForm({ predictedMeasurements, onSubmit, onSki
                   <label className="text-xs text-gray-600 block mb-1">Tu medida real</label>
                   <div className="flex items-center">
                     <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={realMeasurements[key].toFixed(1)}
+                      type="text"
+                      inputMode="decimal"
+                      value={inputValues[key]}
                       onChange={(e) => handleChange(key, e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      placeholder="0"
                     />
                     <span className="ml-2 text-gray-600">cm</span>
                   </div>
