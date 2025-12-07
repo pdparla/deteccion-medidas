@@ -7,6 +7,7 @@ import { useMeasurementSession } from '@/store/measurement-session';
 import { Loader2, Check, AlertCircle } from 'lucide-react';
 import { detectPose } from '@/lib/pose-detection';
 import { segmentPerson } from '@/lib/segmentation';
+import { cleanMaskWithKeypoints } from '@/lib/mask-utils';
 import { calculateBodyMeasurements } from '@/lib/measurement-calculator';
 import { ProcessedCapture } from '@/types/measurement';
 
@@ -59,14 +60,39 @@ export default function ProcessingPage() {
         setProgress(20 + (i / captures.length) * 60);
         const poseResult = await detectPose(capture.dataUrl);
 
-        // Skip segmentation for now - selfie_segmenter has custom ops not supported by LiteRT
-        // setStage('segmenting');
-        // const mask = await segmentPerson(capture.dataUrl);
+        // Run segmentation
+        setStage('segmenting');
+        let maskData: Uint8Array | undefined;
+        try {
+          maskData = await segmentPerson(capture.dataUrl);
+
+          if (maskData) {
+            // Apply Skeleton-Guided Cleaning to remove background noise/dogs
+            maskData = cleanMaskWithKeypoints(maskData, poseResult.keypoints, poseResult.imageWidth, poseResult.imageHeight);
+          }
+        } catch (e) {
+          console.error("Segmentation failed", e);
+        }
+
+        // Generate visualization
+        let visualizedDataUrl = capture.dataUrl;
+        try {
+          visualizedDataUrl = await generateVisualization(capture.dataUrl, poseResult.keypoints, maskData, poseResult.imageWidth, poseResult.imageHeight);
+        } catch (e) {
+          console.error("Failed to generate visualization", e);
+        }
 
         processedCaptures.push({
           ...capture,
           keypoints: poseResult.keypoints,
-          mask: undefined, // Optional field
+          mask: maskData ? {
+            data: maskData,
+            width: 256,
+            height: 256
+          } : undefined,
+          imageWidth: poseResult.imageWidth,
+          imageHeight: poseResult.imageHeight,
+          visualizedDataUrl
         });
       }
 
@@ -165,11 +191,10 @@ export default function ProcessingPage() {
                   return (
                     <div
                       key={s.id}
-                      className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${
-                        isCurrent ? 'bg-blue-50 border border-blue-200' :
+                      className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${isCurrent ? 'bg-blue-50 border border-blue-200' :
                         isComplete ? 'bg-green-50 border border-green-200' :
-                        'bg-gray-50 border border-gray-200'
-                      }`}
+                          'bg-gray-50 border border-gray-200'
+                        }`}
                     >
                       <div className="flex-shrink-0">
                         {isComplete ? (
@@ -183,11 +208,10 @@ export default function ProcessingPage() {
                         )}
                       </div>
                       <div className="flex-1">
-                        <div className={`font-medium ${
-                          isCurrent ? 'text-blue-900' :
+                        <div className={`font-medium ${isCurrent ? 'text-blue-900' :
                           isComplete ? 'text-green-900' :
-                          'text-gray-500'
-                        }`}>
+                            'text-gray-500'
+                          }`}>
                           {s.label}
                         </div>
                         {isCurrent && currentView && (
@@ -217,4 +241,99 @@ export default function ProcessingPage() {
       </Card>
     </div>
   );
+}
+
+async function generateVisualization(
+  imageUrl: string,
+  keypoints: any[],
+  maskData: Uint8Array | undefined,
+  width: number,
+  height: number
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error("Failed to get canvas context");
+        resolve(imageUrl);
+        return;
+      }
+
+      // Draw original image
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Draw mask overlay
+      if (maskData) {
+        console.log("Drawing mask overlay, size:", maskData.length);
+        // Create temporary canvas for mask (256x256)
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = 256;
+        maskCanvas.height = 256;
+        const maskCtx = maskCanvas.getContext('2d');
+        if (maskCtx) {
+          const maskImgData = maskCtx.createImageData(256, 256);
+          for (let i = 0; i < maskData.length; i++) {
+            if (maskData[i] > 0) {
+              // Pink overlay
+              maskImgData.data[i * 4] = 255;     // R
+              maskImgData.data[i * 4 + 1] = 0;   // G
+              maskImgData.data[i * 4 + 2] = 255; // B
+              maskImgData.data[i * 4 + 3] = 100; // Alpha
+            }
+          }
+          maskCtx.putImageData(maskImgData, 0, 0);
+
+          // Draw scaled mask on main canvas
+          ctx.drawImage(maskCanvas, 0, 0, width, height);
+        }
+      } else {
+        console.warn("No mask data available for visualization");
+      }
+
+      // Draw Skeleton
+      ctx.strokeStyle = '#00FF00';
+      ctx.lineWidth = 3;
+      ctx.fillStyle = '#FF0000';
+
+      // Draw points
+      keypoints.forEach(kp => {
+        if (kp.score > 0.3) {
+          ctx.beginPath();
+          ctx.arc(kp.x, kp.y, 4, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      });
+
+      // Connections
+      const connections = [
+        [5, 7], [7, 9], // Left Arm
+        [6, 8], [8, 10], // Right Arm
+        [5, 6], // Shoulders
+        [5, 11], [6, 12], // Torso
+        [11, 12], // Hips
+        [11, 13], [13, 15], // Left Leg
+        [12, 14], [14, 16] // Right Leg
+      ];
+
+      ctx.beginPath();
+      connections.forEach(([i, j]) => {
+        const kp1 = keypoints[i];
+        const kp2 = keypoints[j];
+        if (kp1 && kp2 && kp1.score > 0.3 && kp2.score > 0.3) {
+          ctx.moveTo(kp1.x, kp1.y);
+          ctx.lineTo(kp2.x, kp2.y);
+        }
+      });
+      ctx.stroke();
+
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = reject;
+    img.src = imageUrl;
+  });
 }

@@ -1,6 +1,11 @@
-# MoveNet to Float32 TFLite Conversion
+# Model Conversion Scripts
 
-This directory contains scripts to convert MoveNet models from TensorFlow Hub to float32 TFLite format compatible with LiteRT.js.
+This directory contains scripts to convert ML models to float32 TFLite format compatible with LiteRT.js.
+
+## Available Conversions
+
+1. **MoveNet** - Pose detection (keypoints)
+2. **DeepLabV3** - Person segmentation (body mask)
 
 ## Why This Is Needed
 

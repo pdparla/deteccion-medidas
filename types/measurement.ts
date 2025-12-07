@@ -37,7 +37,10 @@ export interface CapturedImage {
 
 export interface ProcessedCapture extends CapturedImage {
   keypoints: Keypoint[];
-  mask?: SegmentationMask; // Optional - segmentation not always available
+  mask?: SegmentationMask;
+  imageWidth: number;
+  imageHeight: number;
+  visualizedDataUrl?: string;
 }
 
 export interface ValidationResult {

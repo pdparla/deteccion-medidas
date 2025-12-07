@@ -13,7 +13,7 @@
 /.next/
 /out/
 /scripts/venv/
-
+/scripts/venv-linux/
 # production
 /build
 

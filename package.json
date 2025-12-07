@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "mkdir -p public/wasm && cp -r node_modules/@litertjs/core/wasm/* public/wasm/ 2>/dev/null || true"
+    "postinstall": "node scripts/copy-wasm.js"
   },
   "dependencies": {
     "@litertjs/core": "^0.1.0",

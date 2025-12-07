@@ -10,7 +10,7 @@ import { Download, RotateCcw } from 'lucide-react';
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { userInfo, measurements, captures, reset } = useMeasurementSession();
+  const { userInfo, measurements, captures, processedCaptures, reset } = useMeasurementSession();
 
   useEffect(() => {
     if (!userInfo || !measurements) {
@@ -74,10 +74,10 @@ export default function ResultsPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {captures.map((capture) => (
+              {(processedCaptures.length > 0 ? processedCaptures : captures).map((capture) => (
                 <div key={capture.view} className="space-y-2">
                   <img
-                    src={capture.dataUrl}
+                    src={(capture as any).visualizedDataUrl || capture.dataUrl}
                     alt={capture.view}
                     className="w-full rounded-lg border border-gray-200"
                   />

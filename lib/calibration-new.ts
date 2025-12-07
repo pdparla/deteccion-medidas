@@ -1,6 +1,37 @@
-import { Keypoint } from '@/types/measurement';
+import { Keypoint, SegmentationMask } from '@/types/measurement';
 import { KEYPOINTS } from '@/types/pose';
 import { calculateDistance } from './pose-detection';
+
+export function calculatePixelsPerCmFromMask(
+  mask: SegmentationMask,
+  userHeightCm: number
+): number {
+  const { data, width, height } = mask;
+
+  // Find top and bottom pixels of the person
+  let topY = height;
+  let bottomY = 0;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[y * width + x] > 0) { // If pixel is part of person
+        if (y < topY) topY = y;
+        if (y > bottomY) bottomY = y;
+      }
+    }
+  }
+
+  // Safety check
+  if (bottomY <= topY) {
+    console.warn("Could not detect person height from mask, returning 0");
+    return 0;
+  }
+
+  const bodyHeightPx = bottomY - topY;
+
+  // Return pixels per cm ratio
+  return bodyHeightPx / userHeightCm;
+}
 
 export function calculatePixelsPerCm(
   keypoints: Keypoint[],
@@ -56,15 +87,17 @@ export function getYPositionForMeasurement(
       return shoulderY;
 
     case 'chest':
-      // 25% down from shoulders to hips (chest level)
-      return shoulderY + (hipY - shoulderY) * 0.25;
+      // 20% down from shoulders to hips (Higher -> Pecs/Lats)
+      return shoulderY + (hipY - shoulderY) * 0.20;
 
     case 'waist':
       // 60% down from shoulders to hips (narrowest point)
       return shoulderY + (hipY - shoulderY) * 0.6;
 
     case 'hips':
-      return hipY;
+      // Measure at widest part of buttocks
+      // Approx 18% down towards knees
+      return hipY + (kneeY - hipY) * 0.18;
 
     case 'biceps':
       // Use left arm as reference
@@ -72,8 +105,8 @@ export function getYPositionForMeasurement(
       return leftShoulder.y + (leftElbow.y - leftShoulder.y) * 0.5;
 
     case 'thighs':
-      // 20% down from hip to knee
-      return hipY + (kneeY - hipY) * 0.2;
+      // 30% down from hip to knee (lower to find gap)
+      return hipY + (kneeY - hipY) * 0.30;
 
     case 'calves':
       // 40% down from knee to ankle (widest part of calf)

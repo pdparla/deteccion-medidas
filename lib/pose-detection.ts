@@ -15,7 +15,7 @@ export async function initPoseDetection() {
   console.log('Loading pure float32 MoveNet Lightning model...');
 
   poseModel = await loadModel('/models/movenet_lightning_pure_f32.tflite', {
-    accelerator: 'wasm', // Start with WASM for stability
+    accelerator: 'webgpu',
   });
 
   console.log('Model loaded successfully!');
@@ -33,10 +33,26 @@ export async function detectPose(imageDataUrl: string): Promise<PoseResult> {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Failed to get canvas context');
 
+  // MoveNet Lightning expects 192x192 input. preserving aspect ratio is CRITICAL.
+  // Letterbox resize (pad with black)
   const inputSize = 192;
   canvas.width = inputSize;
   canvas.height = inputSize;
-  ctx.drawImage(img, 0, 0, inputSize, inputSize);
+
+  // Fill with black (padding)
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, inputSize, inputSize);
+
+  const scale = Math.min(inputSize / img.width, inputSize / img.height);
+  const scaledWidth = img.width * scale;
+  const scaledHeight = img.height * scale;
+  const dx = (inputSize - scaledWidth) / 2;
+  const dy = (inputSize - scaledHeight) / 2;
+
+  ctx.drawImage(img, dx, dy, scaledWidth, scaledHeight);
+
+  // Store padding info for later mapping
+  const padding = { dx, dy, scale };
 
   // Get image data and convert to RGB tensor
   const imageData = getImageData(canvas);
@@ -68,16 +84,30 @@ export async function detectPose(imageDataUrl: string): Promise<PoseResult> {
 
     // Parse keypoints from MoveNet output
     // MoveNet Lightning outputs shape [1, 1, 17, 3] where each keypoint has [y, x, score]
-    // Keypoints are normalized [0, 1], scale to original image dimensions
+    // Keypoints are normalized [0, 1] relative to the 192x192 INPUT.
+    // We must map them back to the ORIGINAL image.
+
     const keypoints: Keypoint[] = [];
     for (let i = 0; i < 17; i++) {
       const yIndex = i * 3;
       const xIndex = i * 3 + 1;
       const scoreIndex = i * 3 + 2;
 
+      // Raw coords in 192x192 space
+      const rawY = result[yIndex] * inputSize;
+      const rawX = result[xIndex] * inputSize;
+
+      // Remove padding
+      const unpaddedX = rawX - padding.dx;
+      const unpaddedY = rawY - padding.dy;
+
+      // Scale back to original size
+      const originalX = unpaddedX / padding.scale;
+      const originalY = unpaddedY / padding.scale;
+
       keypoints.push({
-        y: result[yIndex] * img.height,
-        x: result[xIndex] * img.width,
+        y: originalY,
+        x: originalX,
         score: result[scoreIndex],
       });
     }
