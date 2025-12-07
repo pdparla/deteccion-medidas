@@ -1,143 +1,94 @@
-# Aplicación de Medidas Corporales
+# Body Measurement App with LiteRT.js
 
-Aplicación web que permite obtener medidas corporales mediante el análisis de 4 fotografías usando TensorFlow.js y MoveNet.
+A Next.js 14+ application for browser-based body measurement using AI. Capture 4 photos (front, right, back, left) and get 8 body measurements calculated entirely in your browser using TensorFlow Lite models via LiteRT.js.
 
-## Características
+## Features
 
-- **Procesamiento 100% en el navegador**: Detección de pose con TensorFlow.js
-- **Sistema de autenticación**: Registro e inicio de sesión seguro
-- **Calibración personalizada**: Cada usuario tiene coeficientes únicos
-- **Altura guardada**: No necesitas ingresarla cada vez
-- **Histórico de mediciones**: Todas tus mediciones guardadas en base de datos
-- **8 medidas corporales**: Cuello, hombros, pecho, cintura, cadera, muslo, gemelo, bíceps
-- **Privacidad total**: Las fotos solo se procesan localmente, nunca se guardan
-- **Precarga optimizada**: El modelo se carga al inicio para análisis rápido
+- **100% Client-Side Processing**: All ML inference runs in the browser (WebGPU with WASM fallback)
+- **Privacy First**: No server uploads - photos never leave your device
+- **8 Measurements**: Neck, shoulders, chest, waist, hips, biceps, thighs, calves
+- **Real-time Pose Validation**: Visual feedback during photo capture
+- **Responsive Design**: Works on desktop and mobile devices
 
-## Tecnologías
+## Tech Stack
 
-### Frontend
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
-- TensorFlow.js + MoveNet Thunder
+- **Framework**: Next.js 14 (App Router)
+- **ML Runtime**: LiteRT.js (@litertjs/core) for TFLite inference
+- **UI**: Tailwind CSS + shadcn/ui components
+- **State**: Zustand for session management
+- **Camera**: react-webcam for photo capture
+- **Models**: MoveNet Thunder (pose), Selfie Segmenter (silhouette)
 
-### Backend
-- Prisma ORM
-- PostgreSQL (Vercel Postgres)
-- NextAuth.js (Autenticación)
-- bcrypt (Encriptación de contraseñas)
+## Getting Started
 
-## Instalación Local
+### 1. Clone and Install
 
-### Requisitos Previos
-- Node.js 18+
-- npm o yarn
-
-### Pasos
-
-1. **Clona el repositorio**
 ```bash
-git clone https://github.com/tu-usuario/deteccion-medidas.git
+git clone <repository-url>
 cd deteccion-medidas
-```
-
-2. **Instala dependencias**
-```bash
 npm install
 ```
 
-3. **Configura variables de entorno**
+The postinstall script will automatically copy LiteRT WASM files to `/public/wasm/`.
+
+### 2. Download TFLite Models
+
 ```bash
-# Copia el archivo .env de ejemplo
-cp .env.example .env
+cd public/models
+
+# MoveNet Thunder (~9MB)
+curl -o movenet_thunder.tflite https://storage.googleapis.com/movenet/movenet_thunder.tflite
+
+# Selfie Segmenter (~10MB)
+curl -o selfie_segmenter.tflite https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite
 ```
 
-Edita `.env` y configura:
-```env
-DATABASE_URL="prisma+postgres://localhost:51213/..."
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="genera-tu-secret-aqui"
-```
+### 3. Run Development Server
 
-Para generar `NEXTAUTH_SECRET`:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-```
-
-4. **Inicia la base de datos local**
-```bash
-npx prisma dev
-```
-
-5. **Ejecuta las migraciones**
-```bash
-npx prisma migrate dev
-```
-
-6. **Inicia el servidor de desarrollo**
 ```bash
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
+Open [http://localhost:3000](http://localhost:3000) and grant camera permissions.
 
-## Uso
+## How It Works
 
-### Primera Vez
-1. Regístrate con email y contraseña
-2. Ingresa tu altura (solo la primera vez)
-3. Sube 4 fotografías (frente, espalda, lateral izquierdo, lateral derecho)
-4. Opcionalmente, calibra con tus medidas reales para mayor precisión
-5. Obtén tus medidas corporales
+### Measurement Algorithm
 
-### Siguientes Veces
-1. Inicia sesión
-2. Sube las 4 fotos directamente (tu altura ya está guardada)
-3. Si ya calibraste, tus coeficientes personalizados se usan automáticamente
+Ellipse-based circumference from 4 orthogonal views:
+- **Width** from front/back silhouette
+- **Depth** from left/right silhouette
+- **Circumference** ≈ π × (3(a+b) - √((3a+b)(a+3b))) (Ramanujan approximation)
 
-### ⚠️ REQUISITOS OBLIGATORIOS para mejores resultados
+### Workflow
 
-- **ROPA INTERIOR ÚNICAMENTE** - Imprescindible para mediciones precisas
-- Distancia: 2-3 metros de la cámara
-- Brazos ligeramente separados del cuerpo
-- Fondo liso con buena iluminación
-- Postura erguida, de pie, completamente visible de pies a cabeza
+1. **User Input**: Height in cm for calibration
+2. **Capture**: 4 photos with real-time pose validation
+3. **Processing**:
+   - Pose detection (17 keypoints per image)
+   - Person segmentation (binary mask)
+   - Width extraction at body levels
+   - Measurement calculation
+4. **Results**: Display 8 measurements with export option
 
-> **Importante:** Las fotos con ropa holgada producirán medidas significativamente incorrectas. El sistema está calibrado para ropa ajustada mínima (ropa interior).
+## Deployment to Vercel
 
-## Despliegue en Vercel
+```bash
+vercel deploy
+```
 
-### Opción 1: Deploy con un Click
+Ensure models are accessible:
+- Upload to `/public/models/` before deploying, OR
+- Host externally and update paths
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/tu-usuario/deteccion-medidas)
+No environment variables required - fully client-side.
 
-### Opción 2: Deploy Manual
+## Browser Compatibility
 
-1. **Conecta tu repositorio con Vercel**
-2. **Crea una base de datos Vercel Postgres:**
-   - Ve a Storage → Create Database → Postgres
-3. **Configura variables de entorno:**
-   ```env
-   DATABASE_URL=${POSTGRES_PRISMA_URL}
-   NEXTAUTH_URL=https://tu-dominio.vercel.app
-   NEXTAUTH_SECRET=tu-secret-generado
-   ```
-4. **Ejecuta migraciones:**
-   ```bash
-   DATABASE_URL="tu-url-vercel-postgres" npx prisma migrate deploy
-   ```
+- **WebGPU**: Chrome 113+, Edge 113+
+- **WASM Fallback**: All modern browsers
+- **Camera**: Requires HTTPS (localhost exempt)
 
-**Para instrucciones detalladas, consulta [DEPLOYMENT.md](DEPLOYMENT.md)**
+## Accuracy Note
 
-## Requisitos del Navegador
-
-- Chrome 90+ (Recomendado)
-- Firefox 88+
-- Edge 90+
-- Safari 14+
-- Soporte para WebGL 2.0
-- Conexión a internet (para cargar el modelo de TensorFlow.js)
-
-## Nota
-
-Las medidas son aproximadas y se basan en análisis de imagen. Para medidas precisas, se recomienda medición manual con cinta métrica.
+Measurements are estimates with ±3-5cm variance. For professional/medical use, consult specialists.
